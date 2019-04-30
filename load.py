@@ -3,8 +3,8 @@ from binance.client import Client
 import pandas as pd
 import os
 from tqdm import tqdm
-import numpy as np
-import multiprocessing
+import numpy
+import pickle
 
 api_key = os.environ["api_key"]
 secret_key = os.environ["secret_key"]
@@ -50,21 +50,30 @@ def load_training_data():
     engine = grab_engine()
     rows = pd.read_sql(sql="SELECT COUNT(open_time) FROM binance_klines", con=engine)['count'][0]
     input_rows = 100
-    manager = multiprocessing.Manager()
-    x_train = manager.array()
-    
+    temp_list = []
     # how many minutes in the future to
     future_predict_time = 1
-    print("Loading X Data")
-    for i in tqdm(range(rows-100)):
-        array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT {input_rows} OFFSET {i}", con=engine)
-        # x_train.append(array)
 
-    print(rows)
+    print("Loading X Training Data")
+    for i in tqdm(range(rows-(input_rows+future_predict_time))):
+        array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT {input_rows} OFFSET {i}", con=engine).values
+        temp_list.append(array)
+    x_train = numpy.array(temp_list)
+    temp_list = []
+
+    print("Loading Y Training Data")
+    for i in tqdm(range(rows-(input_rows+future_predict_time))):
+        array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT 1 OFFSET {i+input_rows+future_predict_time}", con=engine).values
+        temp_list.append(array)
+    y_train = numpy.array(temp_list)
+    temp_list = []
+
+    pickle.dump(x_train, open(os.path.join(os.getcwd(), 'x_train.pickle'), 'wb'))
+    pickle.dump(y_train, open(os.path.join(os.getcwd(), 'y_train.pickle'), 'wb'))
 
 
-def grab_array(connection, rows, offset):
-    array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT {rows} OFFSET {i}", con=engine)
+
+
 
 if __name__ == "__main__":
     # days_ago = 100
