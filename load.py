@@ -5,6 +5,7 @@ import os
 from tqdm import tqdm
 import numpy
 import pickle
+import tensorflow as tf
 
 api_key = os.environ["api_key"]
 secret_key = os.environ["secret_key"]
@@ -54,25 +55,45 @@ def load_training_data():
     # how many minutes in the future to
     future_predict_time = 1
 
-    print("Loading X Training Data")
-    for i in tqdm(range(rows-(input_rows+future_predict_time))):
-        array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT {input_rows} OFFSET {i}", con=engine).values
-        temp_list.append(array)
-    x_train = numpy.array(temp_list)
+    # print("Loading X Training Data")
+    # for i in tqdm(range(rows-(input_rows+future_predict_time))):
+    #     array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT {input_rows} OFFSET {i}", con=engine).values
+    #     temp_list.append(array)
+    # x_train = numpy.array(temp_list)
+    # temp_list = []
+
+    # print("Loading Y Training Data")
+    # for i in tqdm(range(rows-(input_rows+future_predict_time))):
+    #     array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT 1 OFFSET {i+input_rows+future_predict_time}", con=engine).values
+    #     temp_list.append(array[0])
+    # y_train = numpy.array(temp_list)
+    y_train = pd.read_sql(sql=f"SELECT * FROM binance_klines OFFSET {input_rows+future_predict_time}", con=engine).values
+    print(y_train.shape)
     temp_list = []
 
-    print("Loading Y Training Data")
-    for i in tqdm(range(rows-(input_rows+future_predict_time))):
-        array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT 1 OFFSET {i+input_rows+future_predict_time}", con=engine).values
-        temp_list.append(array)
-    y_train = numpy.array(temp_list)
-    temp_list = []
-
-    pickle.dump(x_train, open(os.path.join(os.getcwd(), 'x_train.pickle'), 'wb'))
+    # pickle.dump(x_train, open(os.path.join(os.getcwd(), 'x_train.pickle'), 'wb'))
     pickle.dump(y_train, open(os.path.join(os.getcwd(), 'y_train.pickle'), 'wb'))
 
 
+def train_model():
+    x_train = pickle.load(open(os.path.join(os.getcwd(), 'x_train.pickle'), 'rb'))
+    y_train = pickle.load(open(os.path.join(os.getcwd(), 'y_train.pickle'), 'rb'))
+    print(x_train.shape)
+    print(y_train.shape)
+    print(max([y[2] for y in y_train]))
+    print(min([y[2] for y in y_train]))
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Flatten(input_shape=(100, 11)),
+        tf.keras.layers.Dense(2000, activation=tf.nn.relu),
+        tf.keras.layers.Dense(50)
+    ])
 
+    model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    model.summary()
+
+    model.fit(x_train, [int(y[2]*10000) for y in y_train], epochs=5)
 
 
 if __name__ == "__main__":
@@ -82,5 +103,6 @@ if __name__ == "__main__":
     #     )
     # save_klines(klines)
     # print(f"Saved data for {days_ago} days ago")
-    load_training_data()
+    # load_training_data()
+    train_model()
 

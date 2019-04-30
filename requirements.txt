@@ -1,3 +1,4 @@
+tensorflow
 sqlalchemy
 python-binance
 pandas
