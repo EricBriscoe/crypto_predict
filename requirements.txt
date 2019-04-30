@@ -1,0 +1,5 @@
+sqlalchemy
+python-binance
+pandas
+numpy
+tqdm
