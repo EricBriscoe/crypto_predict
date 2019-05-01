@@ -3,7 +3,7 @@ from binance.client import Client
 import pandas as pd
 import os
 from tqdm import tqdm
-import numpy
+import numpy as np
 import pickle
 import tensorflow as tf
 from sklearn import preprocessing
@@ -49,20 +49,24 @@ def save_klines(kline_list):
     df.to_sql(name="binance_klines", con=engine, if_exists="replace")
 
 
-def load_training_data(x_train_tables, x_test_tables, predict_time, rows_per_table):
+def load_training_data(
+    train_tables, test_tables, predict_time, rows_per_table, predict_param
+):
     engine = grab_engine()
     rows = pd.read_sql(sql="SELECT COUNT(open_time) FROM binance_klines", con=engine)[
         "count"
     ][0]
-    if x_train_tables + x_test_tables + predict_time + rows_per_table >= rows:
+    if train_tables + test_tables + predict_time + rows_per_table >= rows:
         print("Your database does not have enough entries.")
         exit()
 
-    df = pd.read_sql(sql="SELECT open, high, low, close, volume FROM binance_klines", con=engine)
+    df = pd.read_sql(
+        sql="SELECT open, high, low, close, volume FROM binance_klines", con=engine
+    )
     x = df.values  # returns a numpy array
     min_max_scaler = preprocessing.MinMaxScaler()
     x_scaled = min_max_scaler.fit_transform(x)
-    df = pd.DataFrame(x_scaled, columns=['open', 'high', 'low', 'close', 'volume'])
+    df = pd.DataFrame(x_scaled, columns=["open", "high", "low", "close", "volume"])
 
     x_train = []
     y_train = []
@@ -70,14 +74,36 @@ def load_training_data(x_train_tables, x_test_tables, predict_time, rows_per_tab
     y_test = []
 
     print("Loading X Training Data")
-    for i in tqdm(range(x_train_tables)):
-        x_train.append(df[i:i+rows_per_table])
     t.sleep(.1)
+    for i in tqdm(range(train_tables)):
+        x_train.append(df[i : i + rows_per_table].values)
+    t.sleep(0.1)
     print("Done")
     print("Loading Y Training Data")
-    for i in tqdm(range(y_train_tables)):
-        pass
+    sub_df = df[
+        rows_per_table + predict_time : rows_per_table + predict_time + train_tables
+    ]
+    y_train = sub_df[predict_param].values
+    print("Done")
+    print("Loading X Testing Data")
+    t.sleep(.1)
+    for i in tqdm(range(test_tables)):
+        x_test.append(df[i+train_tables:i+train_tables+rows_per_table].values)
+    t.sleep(.1)
+    print("Done")
+    print("Loading Y Testing Data")
+    sub_df = df[
+        rows_per_table + predict_time + train_tables : rows_per_table + predict_time + test_tables + train_tables
+    ]
+    y_test = sub_df[predict_param].values
+    print("Done")
 
+    print(f"X Training Data Structure: ({len(x_train)},{len(x_train[0])},{len(x_train[0][0])})")
+    print(f"Y Training Data Structure: ({len(y_train)})")
+    print(f"X Testing  Data Structure: ({len(x_test)},{len(x_test[0])},{len(x_test[0][0])})")
+    print(f"Y Testing  Data Structure: ({len(y_test)})")
+
+    return (x_train, y_train), (x_test, y_test)
 
 
 if __name__ == "__main__":
@@ -87,4 +113,11 @@ if __name__ == "__main__":
     #     )
     # save_klines(klines)
     # print(f"Saved data for {days_ago} days ago")
-    load_training_data(x_train_tables=100000, x_test_tables=20000, predict_time=1, rows_per_table=100)
+    # load_training_data(
+    #     train_tables=10000,
+    #     test_tables=2000,
+    #     predict_time=1,
+    #     rows_per_table=100,
+    #     predict_param="high",
+    # )
+    pass
