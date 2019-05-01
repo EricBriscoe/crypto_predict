@@ -6,6 +6,8 @@ from tqdm import tqdm
 import numpy
 import pickle
 import tensorflow as tf
+from sklearn import preprocessing
+import time as t
 
 api_key = os.environ["api_key"]
 secret_key = os.environ["secret_key"]
@@ -42,58 +44,40 @@ def save_klines(kline_list):
             "taker_buy_quote_asset_volume",
         ],
     )
-    df.set_index(keys='open_time', inplace=True)
+    df.set_index(keys="open_time", inplace=True)
     print(df)
     df.to_sql(name="binance_klines", con=engine, if_exists="replace")
 
 
-def load_training_data():
+def load_training_data(x_train_tables, x_test_tables, predict_time, rows_per_table):
     engine = grab_engine()
-    rows = pd.read_sql(sql="SELECT COUNT(open_time) FROM binance_klines", con=engine)['count'][0]
-    input_rows = 100
-    temp_list = []
-    # how many minutes in the future to
-    future_predict_time = 1
+    rows = pd.read_sql(sql="SELECT COUNT(open_time) FROM binance_klines", con=engine)[
+        "count"
+    ][0]
+    if x_train_tables + x_test_tables + predict_time + rows_per_table >= rows:
+        print("Your database does not have enough entries.")
+        exit()
 
-    # print("Loading X Training Data")
-    # for i in tqdm(range(rows-(input_rows+future_predict_time))):
-    #     array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT {input_rows} OFFSET {i}", con=engine).values
-    #     temp_list.append(array)
-    # x_train = numpy.array(temp_list)
-    # temp_list = []
+    df = pd.read_sql(sql="SELECT open, high, low, close, volume FROM binance_klines", con=engine)
+    x = df.values  # returns a numpy array
+    min_max_scaler = preprocessing.MinMaxScaler()
+    x_scaled = min_max_scaler.fit_transform(x)
+    df = pd.DataFrame(x_scaled, columns=['open', 'high', 'low', 'close', 'volume'])
 
-    # print("Loading Y Training Data")
-    # for i in tqdm(range(rows-(input_rows+future_predict_time))):
-    #     array = pd.read_sql(sql=f"SELECT * FROM binance_klines LIMIT 1 OFFSET {i+input_rows+future_predict_time}", con=engine).values
-    #     temp_list.append(array[0])
-    # y_train = numpy.array(temp_list)
-    y_train = pd.read_sql(sql=f"SELECT * FROM binance_klines OFFSET {input_rows+future_predict_time}", con=engine).values
-    print(y_train.shape)
-    temp_list = []
+    x_train = []
+    y_train = []
+    x_test = []
+    y_test = []
 
-    # pickle.dump(x_train, open(os.path.join(os.getcwd(), 'x_train.pickle'), 'wb'))
-    pickle.dump(y_train, open(os.path.join(os.getcwd(), 'y_train.pickle'), 'wb'))
+    print("Loading X Training Data")
+    for i in tqdm(range(x_train_tables)):
+        x_train.append(df[i:i+rows_per_table])
+    t.sleep(.1)
+    print("Done")
+    print("Loading Y Training Data")
+    for i in tqdm(range(y_train_tables)):
+        pass
 
-
-def train_model():
-    x_train = pickle.load(open(os.path.join(os.getcwd(), 'x_train.pickle'), 'rb'))
-    y_train = pickle.load(open(os.path.join(os.getcwd(), 'y_train.pickle'), 'rb'))
-    print(x_train.shape)
-    print(y_train.shape)
-    print(max([y[2] for y in y_train]))
-    print(min([y[2] for y in y_train]))
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Flatten(input_shape=(100, 11)),
-        tf.keras.layers.Dense(2000, activation=tf.nn.relu),
-        tf.keras.layers.Dense(50)
-    ])
-
-    model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
-    model.summary()
-
-    model.fit(x_train, [int(y[2]*10000) for y in y_train], epochs=5)
 
 
 if __name__ == "__main__":
@@ -103,6 +87,4 @@ if __name__ == "__main__":
     #     )
     # save_klines(klines)
     # print(f"Saved data for {days_ago} days ago")
-    # load_training_data()
-    train_model()
-
+    load_training_data(x_train_tables=100000, x_test_tables=20000, predict_time=1, rows_per_table=100)
