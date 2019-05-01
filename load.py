@@ -47,9 +47,7 @@ def save_klines(kline_list):
     df.to_sql(name="binance_klines", con=engine, if_exists="replace")
 
 
-def load_training_data(
-    train_tables, test_tables, predict_time, rows_per_table, predict_param
-):
+def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     engine = grab_engine()
     rows = pd.read_sql(sql="SELECT COUNT(open_time) FROM binance_klines", con=engine)[
         "count"
@@ -80,7 +78,7 @@ def load_training_data(
     sub_df = df[
         rows_per_table + predict_time : rows_per_table + predict_time + train_tables
     ]
-    y_train = sub_df[predict_param].values
+    y_train = sub_df.values
     print("Loading X Testing Data")
     t.sleep(0.1)
     for i in tqdm(range(test_tables)):
@@ -96,7 +94,7 @@ def load_training_data(
         + test_tables
         + train_tables
     ]
-    y_test = sub_df[predict_param].values
+    y_test = sub_df.values
     print(f"X Training Data Structure: ({x_train.shape})")
     print(f"Y Training Data Structure: ({y_train.shape})")
     print(f"X Testing  Data Structure: ({x_test.shape})")
@@ -106,16 +104,16 @@ def load_training_data(
 
 
 if __name__ == "__main__":
-    # days_ago = 200
-    # klines = client.get_historical_klines(
-    #     "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC"
-    # )
-    # save_klines(klines)
-    # print(f"Saved data for {days_ago} days ago")
-    load_training_data(
-        train_tables=1000,
-        test_tables=200,
-        predict_time=1,
-        rows_per_table=100,
-        predict_param="high",
+    days_ago = 600
+    klines = client.get_historical_klines(
+        "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC"
     )
+    save_klines(klines)
+    print(f"Saved data for {days_ago} days ago")
+    # load_training_data(
+    #     train_tables=1000,
+    #     test_tables=200,
+    #     predict_time=1,
+    #     rows_per_table=100,
+    #     predict_param="high",
+    # )
