@@ -1,13 +1,11 @@
+import os
+import time as t
+
+import pandas as pd
 import sqlalchemy
 from binance.client import Client
-import pandas as pd
-import os
-from tqdm import tqdm
-import numpy as np
-import pickle
-import tensorflow as tf
 from sklearn import preprocessing
-import time as t
+from tqdm import tqdm
 
 api_key = os.environ["api_key"]
 secret_key = os.environ["secret_key"]
