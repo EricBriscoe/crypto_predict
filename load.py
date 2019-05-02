@@ -97,7 +97,7 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
         + test_tables
         + train_tables
     ]
-    sub_df.drop('volume', axis=1)
+    sub_df = sub_df.drop('volume', axis=1)
     y_test = sub_df.values
     print(f"X Training Data Structure: ({x_train.shape})")
     print(f"Y Training Data Structure: ({y_train.shape})")
