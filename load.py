@@ -1,16 +1,15 @@
-import os
 import time as t
 
 import numpy as np
 import pandas as pd
 import sqlalchemy
-from binance.client import Client
 from sklearn import preprocessing
 from tqdm import tqdm
 
-api_key = os.environ["api_key"]
-secret_key = os.environ["secret_key"]
-client = Client(api_key, secret_key)
+
+# api_key = os.environ["api_key"]
+# secret_key = os.environ["secret_key"]
+# client = Client(api_key, secret_key)
 
 
 def grab_engine():
@@ -44,7 +43,8 @@ def save_klines(kline_list):
     )
     df.set_index(keys="open_time", inplace=True)
     print(df)
-    df.to_sql(name="binance_klines", con=engine, if_exists="replace")
+    df.to_sql(name="binance_klines", con=engine, if_exists="append")
+    return df
 
 
 def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
@@ -104,12 +104,16 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
 
 
 if __name__ == "__main__":
-    days_ago = 600
-    klines = client.get_historical_klines(
-        "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC"
-    )
-    save_klines(klines)
-    print(f"Saved data for {days_ago} days ago")
+    # days_ago = 0
+    # while True:
+    #     days_ago += 1
+    #     klines = client.get_historical_klines(
+    #         "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC", f"{days_ago-1} day ago UTC"
+    #     )
+    #     dframe = save_klines(klines)
+    #     if len(dframe) == 0:
+    #         break
+    #     print(f"Saved data for {days_ago} days ago")
     # load_training_data(
     #     train_tables=1000,
     #     test_tables=200,
@@ -117,3 +121,4 @@ if __name__ == "__main__":
     #     rows_per_table=100,
     #     predict_param="high",
     # )
+    pass
