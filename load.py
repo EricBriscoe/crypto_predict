@@ -65,6 +65,8 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     x_scaled = min_max_scaler.fit_transform(x)
     df = pd.DataFrame(x_scaled, columns=["open", "high", "low", "close", "volume"])
 
+    random_offset = 0
+
     x_train = []
     x_test = []
 
@@ -78,6 +80,7 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     sub_df = df[
         rows_per_table + predict_time : rows_per_table + predict_time + train_tables
     ]
+    sub_df = sub_df.drop('volume', axis=1)
     y_train = sub_df.values
     print("Loading X Testing Data")
     t.sleep(0.1)
@@ -94,6 +97,7 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
         + test_tables
         + train_tables
     ]
+    sub_df.drop('volume', axis=1)
     y_test = sub_df.values
     print(f"X Training Data Structure: ({x_train.shape})")
     print(f"Y Training Data Structure: ({y_train.shape})")
