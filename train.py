@@ -12,6 +12,7 @@ def build_model():
             tf.keras.layers.Flatten(input_shape=(rows, 5)),
             tf.keras.layers.Dense(500),
             tf.keras.layers.Dense(250),
+            tf.keras.layers.Dropout(rate=.01),
             tf.keras.layers.Dense(128),
             tf.keras.layers.Dense(4),
         ]
@@ -39,7 +40,7 @@ def train_model(training_model, epochs):
 
 
 if __name__ == "__main__":
-    model = build_model()
-    # model = tf.keras.models.load_model('scratch_model.md5')
-    model = train_model(model, 4)
+    # model = build_model()
+    model = tf.keras.models.load_model('scratch_model.md5')
+    model = train_model(model, 2)
     model.save('scratch_model.md5')
