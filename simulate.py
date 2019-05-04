@@ -64,12 +64,12 @@ def retrieve_x(rows):
     # df_scaled = pd.DataFrame(x_scaled, columns=["open", "high", "low", "close", "volume"])
     # mults = {col:df[col][0]/df_scaled[col][0] for col in df_scaled.columns}
 
-    print(df_scaled['high'].max())
-    print(df_scaled['high'].min())
+    print(df_scaled["high"].max())
+    print(df_scaled["high"].min())
     print(mults)
 
     for index, row in df.iterrows():
-        assert (row['open'] == df_scaled['open'][index] * mults['open'])
+        assert row["open"] == df_scaled["open"][index] * mults["open"]
     return (df_scaled, mults)
 
 

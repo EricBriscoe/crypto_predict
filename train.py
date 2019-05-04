@@ -40,7 +40,7 @@ def train_model(training_model, epochs):
 
 
 if __name__ == "__main__":
-    # model = build_model()
-    model = tf.keras.models.load_model("scratch_model.md5")
+    model = build_model()
+    # model = tf.keras.models.load_model("scratch_model.md5")
     model = train_model(model, 2)
     model.save("scratch_model.md5")

@@ -1,5 +1,6 @@
 import os
 import time as t
+import random
 
 import numpy as np
 import pandas as pd
@@ -46,9 +47,7 @@ def save_klines(kline_list):
     df.to_sql(name="binance_klines", con=engine, if_exists="replace")
 
 
-def load_training_data(
-    train_tables, test_tables, predict_time, rows_per_table, predict_param
-):
+def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     engine = grab_engine()
     rows = pd.read_sql(sql="SELECT COUNT(open_time) FROM binance_klines", con=engine)[
         "count"
@@ -69,33 +68,38 @@ def load_training_data(
     x_train = np.ndarray(shape=(0, rows_per_table, 5))
     x_test = np.ndarray(shape=(0, rows_per_table, 5))
 
+    max_offset = rows - (
+        train_tables + rows_per_table + test_tables + rows_per_table + predict_time
+    )
+    offset = random.randint(0, max_offset)
+
     print("Loading X Training Data")
     t.sleep(0.1)
     for i in tqdm(range(train_tables)):
-        x_train = np.append(x_train, df[i: i + rows_per_table].values)
+        x_train = np.append(x_train, df[i : i + rows_per_table].values)
     t.sleep(0.1)
     print("Loading Y Training Data")
     sub_df = df[
-        rows_per_table + predict_time : rows_per_table + predict_time + train_tables
+        offset + rows_per_table + predict_time : offset + rows_per_table + predict_time + train_tables
     ]
-    y_train = sub_df[predict_param].values
+    y_train = sub_df.values
     print("Loading X Testing Data")
     t.sleep(0.1)
-    for i in tqdm(range(test_tables)):
+    for i in tqdm(range(offset, test_tables+offset)):
         x_test = np.append(
-            x_test, df[i + train_tables: i + train_tables + rows_per_table].values
+            x_test, df[i + train_tables : i + train_tables + rows_per_table].values
         )
     t.sleep(0.1)
     print("Loading Y Testing Data")
     sub_df = df[
-             rows_per_table
-             + predict_time
-             + train_tables: rows_per_table
-                             + predict_time
-                             + test_tables
-                             + train_tables
-             ]
-    y_test = sub_df[predict_param].values
+        rows_per_table
+        + predict_time
+        + train_tables : rows_per_table
+        + predict_time
+        + test_tables
+        + train_tables
+    ]
+    y_test = sub_df.values
     print(f"X Training Data Structure: ({x_train.shape})")
     print(f"Y Training Data Structure: ({y_train.shape})")
     print(f"X Testing  Data Structure: ({x_test.shape})")
@@ -106,8 +110,11 @@ def load_training_data(
 
 if __name__ == "__main__":
     days_ago = 100
-    klines = client.get_historical_klines(
-        "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC"
-    )
-    save_klines(klines)
-    print(f"Saved data for {days_ago} days ago")
+    while True:
+        klines = client.get_historical_klines(
+            "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC"
+        )
+        if len(klines == 0):
+            break
+        save_klines(klines)
+        print(f"Saved data for {days_ago} days ago")
