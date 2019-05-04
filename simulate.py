@@ -70,7 +70,7 @@ def retrieve_x(rows):
 
     for index, row in df.iterrows():
         assert row["open"] == df_scaled["open"][index] * mults["open"]
-    return (df_scaled, mults)
+    return df_scaled, mults
 
 
 def trade():

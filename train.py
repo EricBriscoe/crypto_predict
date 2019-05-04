@@ -30,7 +30,7 @@ def build_model():
 
 def train_model(training_model, epochs):
     ((x_train, y_train), (x_test, y_test)) = load.load_training_data(
-        train_tables=150000, test_tables=20000, predict_time=1, rows_per_table=rows
+        train_tables=300000, test_tables=50000, predict_time=1, rows_per_table=rows
     )
 
     training_model.fit(x_train, y_train, epochs=epochs)
@@ -40,7 +40,7 @@ def train_model(training_model, epochs):
 
 
 if __name__ == "__main__":
-    model = build_model()
-    # model = tf.keras.models.load_model("scratch_model.md5")
+    # model = build_model()
+    model = tf.keras.models.load_model("scratch_model.md5")
     model = train_model(model, 2)
     model.save("scratch_model.md5")

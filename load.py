@@ -44,12 +44,18 @@ def save_klines(kline_list):
     )
     df.set_index(keys="open_time", inplace=True)
     print(df)
-    df.to_sql(name="binance_klines", con=engine, if_exists="replace")
+    df.to_sql(name="binance_klines", con=engine, if_exists="append")
+    return df
+
+
+def wipe_table():
+    clearer = grab_engine()
+    clearer.execute("DELETE FROM binance_klines WHERE open > 0")
 
 
 def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     engine = grab_engine()
-    rows = pd.read_sql(sql="SELECT COUNT(open_time) FROM binance_klines", con=engine)[
+    rows = pd.read_sql(sql="SELECT DISTINCT COUNT(open_time) FROM binance_klines", con=engine)[
         "count"
     ][0]
     if train_tables + test_tables + predict_time + rows_per_table >= rows:
@@ -58,7 +64,7 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
 
     # Read and normalize dataset
     df = pd.read_sql(
-        sql="SELECT open, high, low, close, volume FROM binance_klines", con=engine
+        sql="SELECT DISTINCT open, high, low, close, volume FROM binance_klines", con=engine
     )
 
     mults = {col: df[col].max() for col in df.columns}
@@ -75,31 +81,38 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
 
     print("Loading X Training Data")
     t.sleep(0.1)
-    for i in tqdm(range(train_tables)):
-        x_train.append(df[i: i + rows_per_table].values)
+    for i in tqdm(range(offset, offset + train_tables)):
+        x_train.append(df[i : i + rows_per_table].values)
     x_train = np.array(x_train)
     t.sleep(0.1)
     print("Loading Y Training Data")
     sub_df = df[
-             rows_per_table + predict_time: rows_per_table + predict_time + train_tables
-             ]
+        offset
+        + rows_per_table
+        + predict_time : offset
+        + rows_per_table
+        + predict_time
+        + train_tables
+    ]
     sub_df = sub_df.drop("volume", axis=1)
     y_train = sub_df.values
     print("Loading X Testing Data")
     t.sleep(0.1)
-    for i in tqdm(range(test_tables)):
-        x_test.append(df[i + train_tables: i + train_tables + rows_per_table].values)
+    for i in tqdm(range(offset, offset + test_tables)):
+        x_test.append(df[i + train_tables : i + train_tables + rows_per_table].values)
     x_test = np.array(x_test)
     t.sleep(0.1)
     print("Loading Y Testing Data")
     sub_df = df[
-             rows_per_table
-             + predict_time
-             + train_tables: rows_per_table
-                             + predict_time
-                             + test_tables
-                             + train_tables
-             ]
+        offset
+        + rows_per_table
+        + predict_time
+        + train_tables : offset
+        + rows_per_table
+        + predict_time
+        + test_tables
+        + train_tables
+    ]
     sub_df = sub_df.drop("volume", axis=1)
     y_test = sub_df.values
     print(f"X Training Data Structure: ({x_train.shape})")
@@ -111,12 +124,14 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
 
 
 if __name__ == "__main__":
-    days_ago = 100
+    wipe_table()
+    days_ago = 0
     while True:
+        days_ago += 1
         klines = client.get_historical_klines(
-            "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC"
+            "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC", f"{days_ago-1} day ago UTC"
         )
-        if len(klines == 0):
+        dframe = save_klines(klines)
+        if len(dframe) == 0:
             break
-        save_klines(klines)
         print(f"Saved data for {days_ago} days ago")
