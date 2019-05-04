@@ -1,15 +1,15 @@
+import os
 import time as t
 
 import numpy as np
 import pandas as pd
 import sqlalchemy
-from sklearn import preprocessing
+from binance.client import Client
 from tqdm import tqdm
 
-
-# api_key = os.environ["api_key"]
-# secret_key = os.environ["secret_key"]
-# client = Client(api_key, secret_key)
+api_key = os.environ["api_key"]
+secret_key = os.environ["secret_key"]
+client = Client(api_key, secret_key)
 
 
 def grab_engine():
@@ -60,10 +60,10 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     df = pd.read_sql(
         sql="SELECT open, high, low, close, volume FROM binance_klines", con=engine
     )
-    x = df.values  # returns a numpy array
-    min_max_scaler = preprocessing.MinMaxScaler()
-    x_scaled = min_max_scaler.fit_transform(x)
-    df = pd.DataFrame(x_scaled, columns=["open", "high", "low", "close", "volume"])
+
+    mults = {col: df[col].max() for col in df.columns}
+    for col in df.columns:
+        df[col] = df[col].apply(lambda x: x / mults[col])
 
     random_offset = 0
 
@@ -80,7 +80,7 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     sub_df = df[
         rows_per_table + predict_time : rows_per_table + predict_time + train_tables
     ]
-    sub_df = sub_df.drop('volume', axis=1)
+    sub_df = sub_df.drop("volume", axis=1)
     y_train = sub_df.values
     print("Loading X Testing Data")
     t.sleep(0.1)
@@ -97,7 +97,7 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
         + test_tables
         + train_tables
     ]
-    sub_df = sub_df.drop('volume', axis=1)
+    sub_df = sub_df.drop("volume", axis=1)
     y_test = sub_df.values
     print(f"X Training Data Structure: ({x_train.shape})")
     print(f"Y Training Data Structure: ({y_train.shape})")
@@ -108,21 +108,16 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
 
 
 if __name__ == "__main__":
-    # days_ago = 0
-    # while True:
-    #     days_ago += 1
-    #     klines = client.get_historical_klines(
-    #         "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC", f"{days_ago-1} day ago UTC"
-    #     )
-    #     dframe = save_klines(klines)
-    #     if len(dframe) == 0:
-    #         break
-    #     print(f"Saved data for {days_ago} days ago")
-    # load_training_data(
-    #     train_tables=1000,
-    #     test_tables=200,
-    #     predict_time=1,
-    #     rows_per_table=100,
-    #     predict_param="high",
-    # )
-    pass
+    days_ago = 0
+    while True:
+        days_ago += 1
+        klines = client.get_historical_klines(
+            "BNBBTC",
+            Client.KLINE_INTERVAL_1MINUTE,
+            f"{days_ago} day ago UTC",
+            f"{days_ago - 1} day ago UTC",
+        )
+        dframe = save_klines(klines)
+        if len(dframe) == 0:
+            break
+        print(f"Saved data for {days_ago} days ago")
