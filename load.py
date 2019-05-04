@@ -65,8 +65,8 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     for col in df.columns:
         df[col] = df[col].apply(lambda x: x / mults[col])
 
-    x_train = np.ndarray(shape=(0, rows_per_table, 5))
-    x_test = np.ndarray(shape=(0, rows_per_table, 5))
+    x_train = []
+    x_test = []
 
     max_offset = rows - (
         train_tables + rows_per_table + test_tables + rows_per_table + predict_time
@@ -76,29 +76,31 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     print("Loading X Training Data")
     t.sleep(0.1)
     for i in tqdm(range(train_tables)):
-        x_train = np.append(x_train, df[i : i + rows_per_table].values)
+        x_train.append(df[i: i + rows_per_table].values)
+    x_train = np.array(x_train)
     t.sleep(0.1)
     print("Loading Y Training Data")
     sub_df = df[
-        offset + rows_per_table + predict_time : offset + rows_per_table + predict_time + train_tables
-    ]
+             rows_per_table + predict_time: rows_per_table + predict_time + train_tables
+             ]
+    sub_df = sub_df.drop("volume", axis=1)
     y_train = sub_df.values
     print("Loading X Testing Data")
     t.sleep(0.1)
-    for i in tqdm(range(offset, test_tables+offset)):
-        x_test = np.append(
-            x_test, df[i + train_tables : i + train_tables + rows_per_table].values
-        )
+    for i in tqdm(range(test_tables)):
+        x_test.append(df[i + train_tables: i + train_tables + rows_per_table].values)
+    x_test = np.array(x_test)
     t.sleep(0.1)
     print("Loading Y Testing Data")
     sub_df = df[
-        rows_per_table
-        + predict_time
-        + train_tables : rows_per_table
-        + predict_time
-        + test_tables
-        + train_tables
-    ]
+             rows_per_table
+             + predict_time
+             + train_tables: rows_per_table
+                             + predict_time
+                             + test_tables
+                             + train_tables
+             ]
+    sub_df = sub_df.drop("volume", axis=1)
     y_test = sub_df.values
     print(f"X Training Data Structure: ({x_train.shape})")
     print(f"Y Training Data Structure: ({y_train.shape})")
