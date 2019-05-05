@@ -5,11 +5,11 @@ import numpy as np
 import pandas as pd
 import sqlalchemy
 from binance.client import Client
-from sklearn import preprocessing
 from tqdm import tqdm
 
 api_key = os.environ["api_key"]
 secret_key = os.environ["secret_key"]
+client = Client(api_key, secret_key)
 
 
 def grab_engine():
@@ -21,7 +21,6 @@ def grab_engine():
 def save_klines(kline_list):
     engine = grab_engine()
     formatted_klines = []
-    client = Client(api_key, secret_key)
     for kline in kline_list:
         kline.pop(-1)
         formatted_klines.append(list(map(float, kline)))
@@ -62,10 +61,10 @@ def load_training_data(
     df = pd.read_sql(
         sql="SELECT open, high, low, close, volume FROM binance_klines", con=engine
     )
-    x = df.values  # returns a numpy array
-    min_max_scaler = preprocessing.MinMaxScaler()
-    x_scaled = min_max_scaler.fit_transform(x)
-    df = pd.DataFrame(x_scaled, columns=["open", "high", "low", "close", "volume"])
+
+    mults = {col: df[col].max() for col in df.columns}
+    for col in df.columns:
+        df[col] = df[col].apply(lambda x: x / mults[col])
 
     x_train = np.ndarray(shape=(0, rows_per_table, 5))
     x_test = np.ndarray(shape=(0, rows_per_table, 5))
@@ -106,16 +105,9 @@ def load_training_data(
 
 
 if __name__ == "__main__":
-    # days_ago = 100
-    # klines = client.get_historical_klines(
-    #     "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC"
-    #     )
-    # save_klines(klines)
-    # print(f"Saved data for {days_ago} days ago")
-    load_training_data(
-        train_tables=1000,
-        test_tables=200,
-        predict_time=1,
-        rows_per_table=100,
-        predict_param="high",
+    days_ago = 100
+    klines = client.get_historical_klines(
+        "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC"
     )
+    save_klines(klines)
+    print(f"Saved data for {days_ago} days ago")
