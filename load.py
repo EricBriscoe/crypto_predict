@@ -55,17 +55,19 @@ def wipe_table():
 
 def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
     engine = grab_engine()
-    rows = pd.read_sql(sql="SELECT DISTINCT COUNT(open_time) FROM binance_klines", con=engine)[
-        "count"
-    ][0]
+    rows = pd.read_sql(
+        sql="SELECT COUNT(DISTINCT open_time) FROM binance_klines", con=engine
+    )["count"][0]
     if train_tables + test_tables + predict_time + rows_per_table >= rows:
         print("Your database does not have enough entries.")
         exit()
 
     # Read and normalize dataset
     df = pd.read_sql(
-        sql="SELECT DISTINCT open, high, low, close, volume FROM binance_klines", con=engine
+        sql="SELECT DISTINCT open_time, open, high, low, close, volume FROM binance_klines ORDER BY open_time DESC",
+        con=engine,
     )
+    df = df.drop("open_time", axis=1)
 
     mults = {col: df[col].max() for col in df.columns}
     for col in df.columns:
@@ -94,7 +96,7 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
         + predict_time
         + train_tables
     ]
-    sub_df = sub_df.drop("volume", axis=1)
+    sub_df = sub_df.drop(["volume", "open", "close"], axis=1)
     y_train = sub_df.values
     print("Loading X Testing Data")
     t.sleep(0.1)
@@ -113,7 +115,7 @@ def load_training_data(train_tables, test_tables, predict_time, rows_per_table):
         + test_tables
         + train_tables
     ]
-    sub_df = sub_df.drop("volume", axis=1)
+    sub_df = sub_df.drop(["volume", "open", "close"], axis=1)
     y_test = sub_df.values
     print(f"X Training Data Structure: ({x_train.shape})")
     print(f"Y Training Data Structure: ({y_train.shape})")
@@ -129,7 +131,10 @@ if __name__ == "__main__":
     while True:
         days_ago += 1
         klines = client.get_historical_klines(
-            "BNBBTC", Client.KLINE_INTERVAL_1MINUTE, f"{days_ago} day ago UTC", f"{days_ago-1} day ago UTC"
+            "BNBBTC",
+            Client.KLINE_INTERVAL_1MINUTE,
+            f"{days_ago} day ago UTC",
+            f"{days_ago-1} day ago UTC",
         )
         dframe = save_klines(klines)
         if len(dframe) == 0:

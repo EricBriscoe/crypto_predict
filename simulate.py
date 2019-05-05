@@ -1,16 +1,23 @@
 import os
+import time
 
 import pandas as pd
 from binance.client import Client
+from binance.websockets import BinanceSocketManager
+import tensorflow as tf
 
 api_key = os.environ["api_key"]
 secret_key = os.environ["secret_key"]
 client = Client(api_key, secret_key)
 
 
-class Wallet:
-    def __init__(self):
-        pass
+def set_bounds():
+    rows = model.layers[0].output_shape[1]
+    print(rows)
+
+
+def process_trade(msg):
+    print(msg)
 
 
 def retrieve_x(rows):
@@ -58,28 +65,24 @@ def retrieve_x(rows):
     for col in df.columns:
         df_scaled[col] = df[col].apply(lambda x: x / mults[col])
 
-    # x = df.values  # returns a numpy array
-    # min_max_scaler = preprocessing.MinMaxScaler()
-    # x_scaled = min_max_scaler.fit_transform(x)
-    # df_scaled = pd.DataFrame(x_scaled, columns=["open", "high", "low", "close", "volume"])
-    # mults = {col:df[col][0]/df_scaled[col][0] for col in df_scaled.columns}
-
     print(df_scaled["high"].max())
     print(df_scaled["high"].min())
     print(mults)
 
     for index, row in df.iterrows():
         assert row["open"] == df_scaled["open"][index] * mults["open"]
-    return df_scaled, mults
+    return df_scaled.values, mults
 
 
-def trade():
-    # Load model
-    # Load input
-    # Normalize Input
-    #
-    pass
+def sim_trade():
+    bm = BinanceSocketManager(client)
+    bm.start_aggtrade_socket("BNBBTC", process_trade)
+    bm.start()
 
 
 if __name__ == "__main__":
-    retrieve_x(100)
+    model = tf.keras.models.load_model("scratch_model.md5")
+    sim_trade()
+    while True:
+        set_bounds()
+        time.sleep(60)
