@@ -14,10 +14,18 @@ client = Client(api_key, secret_key)
 def set_bounds():
     rows = model.layers[0].output_shape[1]
     print(rows)
+    # Retrieve previous Klines
+    # Predict next Klines
+    #
 
 
 def process_trade(msg):
     print(msg)
+    # Read most recent state from table
+    # Determine if trade crossed high or low val
+    # Subtract from the relevant high or low amt if so
+    # Apply Fees
+    # Add new row to table with time incremented by 1
 
 
 def retrieve_x(rows):
@@ -75,6 +83,8 @@ def retrieve_x(rows):
 
 
 def sim_trade():
+    # Initialize wallet
+    # Start processing trades
     bm = BinanceSocketManager(client)
     bm.start_aggtrade_socket("BNBBTC", process_trade)
     bm.start()
