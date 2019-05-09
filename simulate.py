@@ -1,19 +1,24 @@
+import datetime
 import os
 import time
 
 import pandas as pd
 from binance.client import Client
 from binance.websockets import BinanceSocketManager
-import tensorflow as tf
+
+import load
 
 api_key = os.environ["api_key"]
 secret_key = os.environ["secret_key"]
 client = Client(api_key, secret_key)
+engine = load.grab_engine()
 
 
 def set_bounds():
     rows = model.layers[0].output_shape[1]
     print(rows)
+    # Read last state from table
+    df = pd.read_sql("SELECT * FROM ")
     # Retrieve previous Klines
     # Predict next Klines
     #
@@ -21,7 +26,14 @@ def set_bounds():
 
 def process_trade(msg):
     print(msg)
+    # Price in BTC per BNB
+    price = msg["p"]
     # Read most recent state from table
+    df = pd.read_sql(
+        sql="SELECT * FROM public.sim_wallet_log ORDER BY timestamp DESC LIMIT 1",
+        con=engine,
+    )
+    print(df)
     # Determine if trade crossed high or low val
     # Subtract from the relevant high or low amt if so
     # Apply Fees
@@ -83,16 +95,33 @@ def retrieve_x(rows):
 
 
 def sim_trade():
-    # Initialize wallet
     # Start processing trades
     bm = BinanceSocketManager(client)
     bm.start_aggtrade_socket("BNBBTC", process_trade)
     bm.start()
+    time.sleep(10)
+    bm.close()
+
+
+def initialize():
+    df = pd.DataFrame(
+        data={
+            "timestamp": datetime.datetime.now(),
+            "bnb_bal": [100],
+            "btc_bal": [100],
+            "low_trade": [0],
+            "btc_sell_vol": [0],
+            "high_trade": [0],
+            "bnb_sell_vol": [0],
+        }
+    )
+    df.to_sql(name="sim_wallet_log", schema="public", con=engine, if_exists="replace")
 
 
 if __name__ == "__main__":
-    model = tf.keras.models.load_model("scratch_model.md5")
+    initialize()
     sim_trade()
+    exit()
     while True:
         set_bounds()
         time.sleep(60)
