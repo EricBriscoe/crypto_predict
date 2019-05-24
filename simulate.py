@@ -6,20 +6,32 @@ import pandas as pd
 from binance.client import Client
 from binance.websockets import BinanceSocketManager
 
+import tensorflow as tf
+
 import load
 
 api_key = os.environ["api_key"]
 secret_key = os.environ["secret_key"]
 client = Client(api_key, secret_key)
 engine = load.grab_engine()
+model = tf.keras.models.load_model("scratch_model.md5")
 
 
 def set_bounds():
     rows = model.layers[0].output_shape[1]
     print(rows)
     # Read last state from table
-    df = pd.read_sql("SELECT * FROM ")
+    df = pd.read_sql("SELECT * FROM sim_wallet_log", con=engine)
     # Retrieve previous Klines
+    klines = client.get_historical_klines(
+        "BNBBTC",
+        Client.KLINE_INTERVAL_1MINUTE,
+        # f"0 day ago UTC",
+        f"{int(rows/60/24)+1} day ago UTC",
+    )
+    print(int(rows / 60 / 24) + 1)
+    print(type(klines))
+    print(klines)
     # Predict next Klines
     #
 
@@ -120,6 +132,8 @@ def initialize():
 
 if __name__ == "__main__":
     initialize()
+    set_bounds()
+    exit()
     sim_trade()
     exit()
     while True:
