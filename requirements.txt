@@ -1,3 +1,4 @@
+black
 scikit-learn
 tensorflow
 sqlalchemy
@@ -5,3 +6,7 @@ python-binance
 pandas
 numpy
 tqdm
+psycopg2-binary
+pydot
+pydotplus
+matplotlib
