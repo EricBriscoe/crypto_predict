@@ -6,12 +6,9 @@ def create_config():
     # Config values to write
     api_key = input("Input your API key:\n")
     secret_key = input("Input your secret key:\n")
-    config["Binance"] = {
-        "api_key": api_key,
-        "secret_key": secret_key,
-    }
+    config["Binance"] = {"api_key": api_key, "secret_key": secret_key}
     # Save config file
-    with open('config.ini', 'w') as configfile:
+    with open("config.ini", "w") as configfile:
         config.write(configfile)
 
 

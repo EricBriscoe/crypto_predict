@@ -6,16 +6,19 @@ from crypto_predict import load
 try:
     from crypto_predict import sauce
 except ImportError:
+    print("Please create your own model by copying sauce_example.py to sauce.py.")
+    input("Press enter to continue using sauce_example or ctrl+c to quit.")
     from crypto_predict import sauce_example as sauce
 
-hours_of_data = 6
+hours_of_data = 1
 rows = hours_of_data * 60
 
 
+# noinspection PyBroadException
 def train_model(training_model, epochs):
     # 500000 total tables will take around 16 gigs of ram alone
     ((x_train, y_train), (x_test, y_test)) = load.load_training_data(
-        train_tables=400000, test_tables=20000, predict_time=1, rows_per_table=rows
+        train_tables=100000, test_tables=100000, predict_time=1, rows_per_table=rows
     )
     print("Example Data:")
     print(x_train[0])

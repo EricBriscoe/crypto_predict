@@ -6,6 +6,7 @@ import pandas as pd
 import tensorflow as tf
 from binance.client import Client
 from binance.websockets import BinanceSocketManager
+from sqlalchemy.dialects.postgresql import TIMESTAMP, FLOAT
 
 from crypto_predict import config
 from crypto_predict import load
@@ -139,17 +140,35 @@ def initialize():
         data={
             "timestamp": datetime.datetime.now(),
             "bnb_bal": [100],
-            "btc_bal": [100],
+            "btc_bal": [1],
             "low_trade": [0],
+            "low_trade_age": [0],
             "btc_sell_vol": [0],
             "high_trade": [0],
+            "high_trade_age": [0],
             "bnb_sell_vol": [0],
         }
     )
-    df.to_sql(name="sim_wallet_log", schema="public", con=engine, if_exists="replace")
+    df.to_sql(
+        name="sim_wallet_log",
+        schema="public",
+        con=engine,
+        if_exists="replace",
+        dtype={
+            "timestamp": TIMESTAMP,
+            "bnb_bal": FLOAT,
+            "btc_bal": FLOAT,
+            "low_trade": FLOAT,
+            "low_trade_age": FLOAT,
+            "btc_sell_vol": FLOAT,
+            "high_trade": FLOAT,
+            "high_trade_age": FLOAT,
+            "bnb_sell_vol": FLOAT,
+        },
+    )
 
 
-if __name__ == "__main__":
+def ml_trade():
     initialize()
     set_bounds()
     exit()
@@ -158,3 +177,81 @@ if __name__ == "__main__":
     while True:
         set_bounds()
         time.sleep(60)
+
+
+def test_manual_strategy():
+    initialize()
+    history_df = pd.read_sql(
+        sql="SELECT DISTINCT open_time, open, high, low, close, volume FROM binance_klines ORDER BY open_time DESC",
+        con=engine,
+    )
+    wallet_log_df = pd.read_sql(sql="SELECT * FROM sim_wallet_log", con=engine)
+    wallet_current_df = wallet_log_df
+    trade_amount = 0.75
+    price_range_mult = 0.2
+
+    for index, row in history_df.iterrows():
+        if index < 10:
+            continue
+        # Look at wallet_current_df and see if either limit order is satisfied by the current set ranges
+        high = row["high"]
+        low = row["low"]
+        price_range = high - low
+        bnb_bal = wallet_current_df["bnb_bal"][0]
+        btc_bal = wallet_current_df["btc_bal"][0]
+        low_trade = wallet_current_df["low_trade"][0]
+        low_trade_age = wallet_current_df["low_trade_age"][0]
+        btc_sell_vol = wallet_current_df["btc_sell_vol"][0]
+        high_trade = wallet_current_df["high_trade"][0]
+        high_trade_age = wallet_current_df["high_trade_age"][0]
+        bnb_sell_vol = wallet_current_df["bnb_sell_vol"][0]
+
+        # TODO add binance fees
+        if high_trade < high and bnb_sell_vol != 0:
+            btc_bal += bnb_sell_vol * high_trade
+            bnb_sell_vol = 0
+        else:
+            high_trade_age += 1
+
+        if low_trade > low and btc_sell_vol != 0:
+            bnb_bal += btc_sell_vol / low_trade
+            btc_sell_vol = 0
+        else:
+            low_trade_age += 1
+        wallet_current_df["timestamp"] = datetime.datetime.now()
+
+        # Set new limit orders if conditions are met
+        if bnb_sell_vol == 0 or high_trade_age == 60:
+            high_trade = high + (price_range * price_range_mult)
+            bnb_sell_vol += trade_amount * bnb_bal
+            bnb_bal -= trade_amount * bnb_bal
+            high_trade_age = 0
+
+        if btc_sell_vol == 0 or low_trade_age == 60:
+            low_trade = low - (price_range * price_range_mult)
+            btc_sell_vol += trade_amount * btc_bal
+            btc_bal -= trade_amount * btc_bal
+            low_trade_age = 0
+
+        # Update wallet log
+        wallet_current_df["bnb_bal"] = [bnb_bal]
+        wallet_current_df["btc_bal"] = [btc_bal]
+        wallet_current_df["low_trade"] = [low_trade]
+        wallet_current_df["low_trade_age"] = [low_trade_age]
+        wallet_current_df["btc_sell_vol"] = [btc_sell_vol]
+        wallet_current_df["high_trade"] = [high_trade]
+        wallet_current_df["high_trade_age"] = [high_trade_age]
+        wallet_current_df["bnb_sell_vol"] = [bnb_sell_vol]
+        wallet_log_df = wallet_current_df.append(wallet_log_df, ignore_index=True)
+        if index % 1440 == 0:
+            wallet_log_df.to_sql(name="sim_wallet_log", con=engine, if_exists="replace")
+            print(
+                f"Wallet Value in BTC: {wallet_current_df['btc_bal'][0] + wallet_current_df['btc_sell_vol'][0] + (
+                            wallet_current_df['bnb_bal'][0] + wallet_current_df['bnb_sell_vol'][0]) * high}"
+            )
+    input("Press enter to continue")
+    pass
+
+
+if __name__ == "__main__":
+    test_manual_strategy()

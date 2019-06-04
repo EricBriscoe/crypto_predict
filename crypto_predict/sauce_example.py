@@ -1,5 +1,6 @@
-import load
 import tensorflow as tf
+
+from crypto_predict import load
 
 
 def build_model(rows):
@@ -11,13 +12,13 @@ def build_model(rows):
     model_frame = tf.keras.Sequential(
         [
             tf.keras.layers.Flatten(input_shape=(rows, 5)),
-            tf.keras.layers.Dense(125, activation=tf.nn.relu),
+            tf.keras.layers.Dense(125),
             tf.keras.layers.Dense(2),
         ]
     )
 
     model_frame.compile(
-        optimizer=tf.keras.optimizers.Adam(),
+        optimizer=tf.keras.optimizers.RMSprop(),
         loss="mean_squared_error",
         metrics=["mean_absolute_error", "mean_squared_error"],
     )
