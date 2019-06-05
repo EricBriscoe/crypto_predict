@@ -1,5 +1,6 @@
 import datetime
 import time
+from multiprocessing import Process
 
 import numpy
 import pandas as pd
@@ -179,18 +180,105 @@ def ml_trade():
         time.sleep(60)
 
 
-def test_manual_strategy():
+def test_kdj_strategy():
     initialize()
     history_df = pd.read_sql(
-        sql="SELECT DISTINCT open_time, open, high, low, close, volume FROM binance_klines ORDER BY open_time DESC",
+        sql="SELECT DISTINCT open_time, open, high, low, close, volume FROM binance_klines ORDER BY open_time ASC",
+        con=engine,
+    )
+    wallet_log_df = pd.read_sql(sql="SELECT * FROM sim_wallet_log", con=engine)
+    wallet_current_df = wallet_log_df
+
+    sell_trade_percent = 0.2
+    buy_trade_percent = 0.05
+    report_interval = 10000
+    period = 14
+    fee = 1 - 0.000750
+    k = []
+    d = []
+    j = []
+
+    for index, row in history_df[period:].iterrows():
+
+        # Calculate %K
+        period_high = max(history_df["high"][index - period: index])
+        period_low = min(history_df["low"][index - period: index])
+        current_close = row["close"]
+        k.append((current_close - period_low) / (period_high - period_low) * 100)
+
+        # Calculate %D
+        if index < 2 + period:
+            continue
+        d.append((k[index - period] + k[index - 1 - period] + k[index - 2 - period]))
+        # TODO Calculate %J?
+        if index < 4 + period:
+            continue
+
+        # Pull Variables
+        high = row["high"]
+        low = row["low"]
+        price = (high + low) / 2
+        bnb_bal = wallet_current_df["bnb_bal"][0]
+        btc_bal = wallet_current_df["btc_bal"][0]
+        if index % report_interval == 0:
+            job = Process(target=update_wallet_log(wallet_log_df))
+            job.start()
+            print(
+                f"Wallet Value in BTC: {wallet_current_df['btc_bal'][0] + wallet_current_df['btc_sell_vol'][0] + (
+            wallet_current_df['bnb_bal'][0] + wallet_current_df['bnb_sell_vol'][0]) *high}",
+        end = " ",
+        flush = True,
+    )
+    # Conditions for buy or sell
+    wallet_update = 0
+    # Buy bnb here
+    if (
+    k[index - 1 - period] > d[index - 3 - period]
+    and k[index - 2 - period] < d[index - 4 - period]
+
+):
+bnb_bal += (btc_bal * buy_trade_percent) / price * fee
+btc_bal -= btc_bal * buy_trade_percent
+wallet_update = 1
+# Sell bnb here
+elif (
+k[index - 1 - period] < d[index - 3 - period]
+and k[index - 2 - period] > d[index - 4 - period]
+):
+btc_bal += (bnb_bal * sell_trade_percent) * price * fee
+bnb_bal -= bnb_bal * sell_trade_percent
+wallet_update = 1
+
+# Update wallet log
+if wallet_update:
+    wallet_current_df["bnb_bal"] = [bnb_bal]
+wallet_current_df["btc_bal"] = [btc_bal]
+wallet_log_df = wallet_current_df.append(wallet_log_df, ignore_index=True)
+if index % report_interval == 0:
+    job.join()
+
+
+def test_manual_limit_strategy():
+    initialize()
+    history_df = pd.read_sql(
+        sql="SELECT DISTINCT open_time, open, high, low, close, volume FROM binance_klines ORDER BY open_time ASC",
         con=engine,
     )
     wallet_log_df = pd.read_sql(sql="SELECT * FROM sim_wallet_log", con=engine)
     wallet_current_df = wallet_log_df
     trade_amount = 0.75
-    price_range_mult = 0.2
+    price_range_mult = 4
+    max_age = 240
 
     for index, row in history_df.iterrows():
+
+        if index % 1440 == 0:
+            job = Process(target=update_wallet_log(wallet_log_df))
+            job.start()
+            print(
+                f"Wallet Value in BTC: {wallet_current_df['btc_bal'][0] + wallet_current_df['btc_sell_vol'][0] + (
+            wallet_current_df['bnb_bal'][0] + wallet_current_df['bnb_sell_vol'][0]) *high}"
+        )
         if index < 10:
             continue
         # Look at wallet_current_df and see if either limit order is satisfied by the current set ranges
@@ -206,7 +294,6 @@ def test_manual_strategy():
         high_trade_age = wallet_current_df["high_trade_age"][0]
         bnb_sell_vol = wallet_current_df["bnb_sell_vol"][0]
 
-        # TODO add binance fees
         if high_trade < high and bnb_sell_vol != 0:
             btc_bal += bnb_sell_vol * high_trade
             bnb_sell_vol = 0
@@ -221,13 +308,13 @@ def test_manual_strategy():
         wallet_current_df["timestamp"] = datetime.datetime.now()
 
         # Set new limit orders if conditions are met
-        if bnb_sell_vol == 0 or high_trade_age == 60:
+    if bnb_sell_vol == 0 or high_trade_age == max_age:
             high_trade = high + (price_range * price_range_mult)
             bnb_sell_vol += trade_amount * bnb_bal
             bnb_bal -= trade_amount * bnb_bal
             high_trade_age = 0
 
-        if btc_sell_vol == 0 or low_trade_age == 60:
+    if btc_sell_vol == 0 or low_trade_age == max_age:
             low_trade = low - (price_range * price_range_mult)
             btc_sell_vol += trade_amount * btc_bal
             btc_bal -= trade_amount * btc_bal
@@ -243,15 +330,11 @@ def test_manual_strategy():
         wallet_current_df["high_trade_age"] = [high_trade_age]
         wallet_current_df["bnb_sell_vol"] = [bnb_sell_vol]
         wallet_log_df = wallet_current_df.append(wallet_log_df, ignore_index=True)
-        if index % 1440 == 0:
-            wallet_log_df.to_sql(name="sim_wallet_log", con=engine, if_exists="replace")
-            print(
-                f"Wallet Value in BTC: {wallet_current_df['btc_bal'][0] + wallet_current_df['btc_sell_vol'][0] + (
-                            wallet_current_df['bnb_bal'][0] + wallet_current_df['bnb_sell_vol'][0]) * high}"
-            )
-    input("Press enter to continue")
-    pass
+
+
+def update_wallet_log(df):
+    df.to_sql(name="sim_wallet_log", con=engine, if_exists="replace")
 
 
 if __name__ == "__main__":
-    test_manual_strategy()
+    test_kdj_strategy()
